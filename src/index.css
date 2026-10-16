@@ -1,0 +1,98 @@
+@import 'leaflet/dist/leaflet.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-navy: #142D4E;
+  --teal-actions: #087F8C;
+  --background: #F5F8FC;
+  --card-bg: #FFFFFF;
+  --secondary-text: #526176;
+  --caution: #B45309;
+  --critical: #B42318;
+  --resolved: #237A4B;
+  --test-banner: #FFF0D6;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--background);
+  color: #1E293B;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom Tactical Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #E2E8F0;
+}
+::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* Leaflet Container customization */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #E9ECEF;
+  font-family: inherit;
+}
+
+/* Leaflet Popups custom styling */
+.custom-tactical-popup .leaflet-popup-content-wrapper {
+  background: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(20, 45, 78, 0.2), 0 8px 10px -6px rgba(20, 45, 78, 0.1);
+  border: 1px solid #CBD5E1;
+  padding: 0;
+  overflow: hidden;
+}
+
+.custom-tactical-popup .leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Radar pulse animation for critical hazard markers */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.2;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.pulse-hazard {
+  animation: pulse-ring 2.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+/* Tactical pattern for estimated & forecast overlays */
+.pattern-striped {
+  background-size: 10px 10px;
+  background-image: repeating-linear-gradient(45deg, rgba(8, 127, 140, 0.15) 0, rgba(8, 127, 140, 0.15) 2px, transparent 0, transparent 8px);
+}
