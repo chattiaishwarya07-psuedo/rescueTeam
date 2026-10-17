@@ -13,11 +13,10 @@ export function useAuthRole() {
 
   const permissions = {
     canView: true,
-    canAnnotate: ['Analyst', 'Incident Reviewer', 'Authorized Approver', 'Administrator'].includes(responder.role),
-    canConfirmReject: ['Incident Reviewer', 'Authorized Approver', 'Administrator'].includes(responder.role),
-    canApprovePublicAlert: ['Authorized Approver', 'Administrator'].includes(responder.role),
-    canAssignUnits: ['Incident Reviewer', 'Authorized Approver', 'Administrator'].includes(responder.role),
-    isAdministrator: responder.role === 'Administrator',
+    canAnnotate: ['Incident Reviewer', 'District Emergency Operations Officer'].includes(responder.role),
+    canConfirmReject: ['Incident Reviewer', 'District Emergency Operations Officer'].includes(responder.role),
+    canApprovePublicAlert: responder.role === 'District Emergency Operations Officer',
+    isDistrictOfficer: responder.role === 'District Emergency Operations Officer',
   };
 
   return {
@@ -27,6 +26,6 @@ export function useAuthRole() {
     setRole,
     permissions,
     availableJurisdictions: AVAILABLE_JURISDICTIONS,
-    availableRoles: ['Viewer', 'Analyst', 'Incident Reviewer', 'Authorized Approver', 'Administrator'] as ResponderRole[],
+    availableRoles: ['Viewer', 'Incident Reviewer', 'District Emergency Operations Officer'] as ResponderRole[],
   };
 }

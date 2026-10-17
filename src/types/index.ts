@@ -4,32 +4,46 @@ export type HazardType = 'flood' | 'wildfire' | 'severe_weather' | 'landslide';
 
 export type SeverityLevel = 'critical' | 'high' | 'moderate' | 'minor';
 
-export type IncidentStatus =
-  | 'detected'
-  | 'under_review'
-  | 'confirmed'
-  | 'rejected'
+export type IncidentStatus = 
+  | 'detected' 
+  | 'under_review' 
+  | 'confirmed' 
+  | 'rejected' 
   | 'alert_approved';
 
 export type TrendDirection = 'increasing' | 'stable' | 'decreasing' | 'unknown';
 
-export type FreshnessStatus = 'Current' | 'Delayed' | 'Stale' | 'Unavailable';
+export type FreshnessStatus = 'Fresh' | 'Delayed' | 'Stale' | 'Unavailable';
 
-export type ResponderRole =
-  | 'Viewer'
-  | 'Analyst'
-  | 'Incident Reviewer'
-  | 'Authorized Approver'
-  | 'Administrator';
+export type ResponderRole = 
+  | 'Viewer' 
+  | 'Incident Reviewer' 
+  | 'District Emergency Operations Officer';
 
-export interface LatLng {
+export type AlertTier = 'Official Warning' | 'Model Estimate' | 'Unverified Advisory';
+
+export interface CWCGauge {
+  id: string;
+  stationName: string;
+  riverName: string;
+  currentLevelMeters: number;
+  warningLevelMeters: number;
+  dangerLevelMeters: number;
+  trend: 'rising' | 'falling' | 'steady';
+  sparkline: number[];
   lat: number;
   lng: number;
+  lastUpdated: string;
 }
 
-export interface GeoPolygon {
-  type: 'Polygon';
-  coordinates: [number, number][]; // [lat, lng] array
+export interface FIRMSRecord {
+  id: string;
+  lat: number;
+  lng: number;
+  frpMW: number; // Fire Radiative Power (MW)
+  confidence: number;
+  satellite: 'Aqua' | 'Terra' | 'SNPP';
+  acquisitionTime: string;
 }
 
 export interface ForecastStep {
@@ -39,28 +53,26 @@ export interface ForecastStep {
   uncertaintyPolygon?: [number, number][]; // coordinates for uncertainty envelope
   affectedAreaKm2: number;
   trend: TrendDirection;
-  projectedPeakTime?: string;
   speedKmh?: number;
-  directionDeg?: number;
   directionText?: string;
   confidenceScore: number; // 0-100%
   uncertaintyMarginKm: number;
   modelName: string;
   generatedAt: string;
   notes: string;
+  nextLikelyAffected?: string;
 }
 
 export interface ObservationRecord {
   id: string;
-  source: string; // e.g., 'Copernicus Sentinel-1 SAR', 'NOAA GOES-18 ABI'
-  sensorType: 'satellite_radar' | 'satellite_optical' | 'weather_radar' | 'river_gauge' | 'thermal_infrared';
-  timestamp: string; // ISO string
-  ingestedAt: string; // ISO string
-  groundResolutionMeters?: number;
-  cloudCoverPercent?: number;
-  confidenceScore: number; // 0-100%
-  rawMetricValue?: string; // e.g. "Water gauge: +3.8m above flood stage"
+  source: string;
+  sensorType: 'satellite_sar' | 'satellite_optical' | 'geostationary_ir' | 'cwc_gauge' | 'firms_thermal' | 'imd_doppler';
+  timestamp: string;
+  ingestedAt: string;
+  confidenceScore: number;
+  rawMetricValue?: string;
   qualityNote: string;
+  rawPayload?: Record<string, any>;
 }
 
 export interface AuditLogEntry {
@@ -68,28 +80,45 @@ export interface AuditLogEntry {
   timestamp: string;
   actor: string;
   role: ResponderRole;
-  action: 'Detected' | 'Review Started' | 'Confirmed' | 'Rejected' | 'Annotated' | 'Unit Assigned' | 'Alert Approved' | 'Alert Dispatched' | 'Status Change';
+  action: 'Detected' | 'Review Started' | 'Confirmed' | 'Rejected' | 'Annotated' | 'Alert Drafted' | 'Alert Approved' | 'Alert Sent' | 'All-Clear Sent' | 'Status Change';
+  target: string;
   previousStatus?: IncidentStatus;
   newStatus?: IncidentStatus;
   reason?: string;
-  notes?: string;
+  note?: string;
   details?: Record<string, any>;
+}
+
+export interface PrecautionItem {
+  id: string;
+  icon: string;
+  label: string;
+  code: string;
 }
 
 export interface PublicAlert {
   id: string;
   incidentId: string;
+  tier: AlertTier;
   headline: string;
   instruction: string;
+  translations: {
+    en: { headline: string; instruction: string };
+    hi: { headline: string; instruction: string };
+    te: { headline: string; instruction: string };
+    ml: { headline: string; instruction: string };
+  };
+  humanTranslationChecked: boolean;
+  precautions: string[];
   urgency: 'Immediate' | 'Expected' | 'Future';
   severity: 'Extreme' | 'Severe' | 'Moderate' | 'Minor';
   certainty: 'Observed' | 'Likely' | 'Possible';
-  affectedZoneName: string;
+  affectedZones: string[];
   targetJurisdiction: string;
   zonePolygon?: [number, number][];
-  estimatedPopulationExposed?: number;
-  expectedImpactWindow: string;
-  practicalPrecautions: string[];
+  estimatedPopulationReached: number;
+  effectiveFrom: string;
+  effectiveTo: string;
   evidenceSource: string;
   observationTime: string;
   forecastUncertaintyRef: string;
@@ -97,39 +126,57 @@ export interface PublicAlert {
   authorizedBy: string;
   authorizedRole: ResponderRole;
   approvedAt: string;
-  deliveryStatus: 'Drafted' | 'Queued' | 'Transmitting' | 'Delivered' | 'Simulated Broadcast';
-  channels: ('Cell Broadcast' | 'EAS' | 'Resident Relay' | 'Siren Array')[];
-  deliveryMetrics?: {
-    towersTriggered: number;
-    receiptAcks: number;
-  };
+  deliveryStatus: 'Queued' | 'Sent' | 'Delivered' | 'Failed';
+  channels: ('App Notification' | 'SMS' | 'Voice Script' | 'CAP XML')[];
+  retryCount?: number;
+  isAllClear?: boolean;
 }
 
 export interface Incident {
-  id: string; // e.g., 'INC-2026-FL04'
+  id: string;
   title: string;
   hazardType: HazardType;
   severity: SeverityLevel;
   status: IncidentStatus;
+  sector: string;
   locationName: string;
   jurisdiction: string;
-  center: LatLng;
+  center: { lat: number; lng: number };
+  
+  // Polygons & Geometry
   observedExtentPolygon: [number, number][];
+  referenceExtentPolygon?: [number, number][]; // Ground truth comparison for metrics
   estimatedAffectedAreaKm2: number;
-  populationExposedEstimate?: number;
-
+  uncertaintyAreaKm2: number;
+  populationExposedEstimate: number;
+  
+  // Method statement
+  methodSentence: string;
+  
   // Timestamps
   observationTime: string;
   ingestionTime: string;
   lastUpdatedTime: string;
-
-  // Source telemetry
+  
+  // Feeds & Confidence
   primarySource: string;
-  confidenceScore: number; // e.g. 91%
+  confidenceScore: number;
+  confidenceExplanation: string;
   uncertaintyRadiusMeters: number;
-  deduplicationCount: number; // number of underlying detections merged
-  deduplicationNotes: string;
-
+  deduplicationCount: number;
+  mergedSources: string[];
+  isFeedStale?: boolean;
+  staleFeedName?: string;
+  staleFeedDuration?: string;
+  
+  // Replay timeline
+  timelineSteps?: {
+    t0: [number, number][];
+    t6h: [number, number][];
+    t12h: [number, number][];
+    t24h: [number, number][];
+  };
+  
   // Forecast & Trend
   trend: TrendDirection;
   forecasts: {
@@ -138,15 +185,15 @@ export interface Incident {
     '+3h': ForecastStep;
     '+6h': ForecastStep;
   };
-
+  
   // Observations chain
   observations: ObservationRecord[];
-
+  
   // Operations & Workflow
-  assignedTeam?: string;
   auditTrail: AuditLogEntry[];
   publicAlert?: PublicAlert;
   responderNotes: {
+    id: string;
     author: string;
     role: string;
     timestamp: string;
@@ -157,28 +204,14 @@ export interface Incident {
 export interface TelemetryFeed {
   id: string;
   name: string;
-  sourceType: 'Satellite SAR' | 'Satellite Optical' | 'Geostationary' | 'Doppler Radar' | 'Hydrometric Gauge' | 'Thermal Array';
+  source: string;
   satelliteOrStation: string;
-  jurisdiction: string;
   lastObservationTime: string;
-  lastSuccessfulUpdate: string;
-  expectedIntervalMinutes: number;
+  lastIngestedTime: string;
+  typicalRevisit: string;
+  typicalRevisitMinutes: number;
+  nextExpected: string;
   latencyMinutes: number;
   status: FreshnessStatus;
-  resolutionOrSensors: string;
   operationalNotes: string;
-}
-
-export interface RescueUnit {
-  id: string;
-  callsign: string;
-  unitType: 'Swiftwater Rescue' | 'Wildland Firefighting' | 'Helitack Search & Rescue' | 'Medical Evac' | 'Structural Assessment';
-  personnelCount: number;
-  status: 'Available' | 'Dispatched' | 'On Scene' | 'Standby' | 'Restricted';
-  currentLocation: LatLng;
-  locationName: string;
-  assignedIncidentId?: string;
-  equipmentSummary: string;
-  radioFrequency: string;
-  etaMinutes?: number;
 }

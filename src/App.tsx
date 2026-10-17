@@ -1,22 +1,17 @@
 // src/App.tsx
 import React, { useState } from 'react';
-import { Header } from './components/layout/Header';
-import { Sidebar, ActiveModule } from './components/layout/Sidebar';
+import { TopBar } from './components/layout/TopBar';
+import { LeftRail, MainNavView } from './components/layout/LeftRail';
 import { OperationsOverview } from './components/layout/OperationsOverview';
-import { LiveDispatchMapView } from './components/modules/LiveDispatchMapView';
-import { RescueUnitsView } from './components/modules/RescueUnitsView';
-import { TelemetryView } from './components/modules/TelemetryView';
-import { ShelterEvacuationView } from './components/modules/ShelterEvacuationView';
-import { CommsRelayView } from './components/modules/CommsRelayView';
-import { PostIncidentLogsView } from './components/modules/PostIncidentLogsView';
-import { PublicAlertApprovalModal } from './components/alerts/PublicAlertApprovalModal';
-import { UnitDispatchModal } from './components/incidents/UnitDispatchModal';
-import { AuditTrailModal } from './components/audit/AuditTrailModal';
-import { DataFreshnessDrawer } from './components/telemetry/DataFreshnessDrawer';
+import { OperationsMap } from './components/map/OperationsMap';
+import { AlertsListView } from './components/alerts/AlertsListView';
+import { MetricsView } from './components/metrics/MetricsView';
+import { DataSourcesPanel } from './components/telemetry/DataSourcesPanel';
+import { AuditLogView } from './components/audit/AuditLogView';
+import { AboutModal } from './components/layout/AboutModal';
 import { useAuthRole } from './hooks/useAuthRole';
 import { useIncidents } from './hooks/useIncidents';
-import { INITIAL_FEEDS, INITIAL_RESCUE_UNITS } from './services/mockData';
-import { Incident } from './types';
+import { INITIAL_FEEDS, AVAILABLE_SECTORS } from './services/mockData';
 
 export function App() {
   // Auth & Roles
@@ -34,6 +29,7 @@ export function App() {
   const {
     incidents,
     filteredIncidents,
+    areaFilteredIncidents,
     selectedIncident,
     selectedIncidentId,
     setSelectedIncidentId,
@@ -46,182 +42,145 @@ export function App() {
     setHazardFilter,
     severityFilter,
     setSeverityFilter,
-    jurisdictionFilter,
-    setJurisdictionFilter,
     statusFilter,
     setStatusFilter,
+    sectorFilter,
+    setSectorFilter,
+    areaFilter,
+    setAreaFilter,
+    clearAreaFilter,
     sortBy,
     setSortBy,
+    clearFilters,
     confirmIncident,
     rejectIncident,
     addAnnotation,
-    assignUnit,
     approveAlert,
     resetSimulation
   } = useIncidents(responder.name, responder.role);
 
-  // Active module navigation
-  const [activeModule, setActiveModule] = useState<ActiveModule>('incident_overview');
-
-  // Low bandwidth sync mode
-  const [lowBandwidthMode, setLowBandwidthMode] = useState(false);
+  // Active navigation view on left rail
+  const [activeNavView, setActiveNavView] = useState<MainNavView>('incidents');
 
   // Modals state
-  const [alertModalIncident, setAlertModalIncident] = useState<Incident | null>(null);
-  const [unitDispatchIncident, setUnitDispatchIncident] = useState<Incident | null>(null);
-  const [auditModalOpen, setAuditModalOpen] = useState(false);
-  const [freshnessDrawerOpen, setFreshnessDrawerOpen] = useState(false);
-
-  const staleFeedsCount = INITIAL_FEEDS.filter(f => f.status === 'Delayed' || f.status === 'Stale').length;
+  const [dataSourcesOpen, setDataSourcesOpen] = useState(false);
+  const [aboutModalOpen, setAboutModalOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-opbg">
-      {/* 1. Header with Persistent Simulation Banner & Role Switcher */}
-      <Header
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-opbg select-none font-sans">
+      {/* 1. Top Bar (56px) + Slim Amber Simulation Banner */}
+      <TopBar
         responder={responder}
         jurisdiction={jurisdiction}
+        selectedSector={sectorFilter}
         availableJurisdictions={availableJurisdictions}
-        availableRoles={availableRoles}
-        onRoleChange={setRole}
+        availableSectors={AVAILABLE_SECTORS}
         onJurisdictionChange={setJurisdiction}
-        pendingReviewCount={stats.awaitingReview}
-        staleFeedsCount={staleFeedsCount}
-        onResetSimulation={resetSimulation}
-        onOpenFreshnessDrawer={() => setFreshnessDrawerOpen(true)}
-        lowBandwidthMode={lowBandwidthMode}
-        onToggleLowBandwidth={() => setLowBandwidthMode(!lowBandwidthMode)}
+        onSectorChange={setSectorFilter}
+        onRoleChange={setRole}
+        pendingReviewsCount={stats.awaitingReview}
+        feeds={INITIAL_FEEDS}
+        onOpenDataSources={() => setDataSourcesOpen(true)}
+        onResetDemo={resetSimulation}
+        onOpenAbout={() => setAboutModalOpen(true)}
       />
 
-      {/* 2. Main Body: Sidebar + Workspace Canvas */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar
-          activeModule={activeModule}
-          onSelectModule={setActiveModule}
-          lowBandwidth={lowBandwidthMode}
-          onToggleLowBandwidth={() => setLowBandwidthMode(!lowBandwidthMode)}
-          pendingReviewCount={stats.awaitingReview}
+      {/* 2. Main Workspace: Left Rail + Dynamic Center Views */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Left Rail (Icon-only, expands on hover) */}
+        <LeftRail
+          activeView={activeNavView}
+          onSelectView={(view) => {
+            if (view === 'datasources') {
+              setDataSourcesOpen(true);
+            } else {
+              setActiveNavView(view);
+            }
+          }}
+          pendingReviewsCount={stats.awaitingReview}
+          onOpenAbout={() => setAboutModalOpen(true)}
         />
 
-        {/* Dynamic Module View */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-          {activeModule === 'incident_overview' && (
+        {/* Dynamic Center Stage */}
+        <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+          {activeNavView === 'incidents' && (
             <OperationsOverview
               incidents={incidents}
+              areaFilteredIncidents={areaFilteredIncidents}
               filteredIncidents={filteredIncidents}
               selectedIncident={selectedIncident}
               selectedIncidentId={selectedIncidentId}
               onSelectIncident={setSelectedIncidentId}
+              areaFilter={areaFilter}
+              setAreaFilter={setAreaFilter}
+              clearAreaFilter={clearAreaFilter}
               forecastHorizon={forecastHorizon}
               onForecastHorizonChange={setForecastHorizon}
-              rescueUnits={INITIAL_RESCUE_UNITS}
               feeds={INITIAL_FEEDS}
               currentResponder={responder}
-              permissions={permissions}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               hazardFilter={hazardFilter}
               onHazardFilterChange={setHazardFilter}
               severityFilter={severityFilter}
               onSeverityFilterChange={setSeverityFilter}
-              jurisdictionFilter={jurisdictionFilter}
-              onJurisdictionFilterChange={setJurisdictionFilter}
               statusFilter={statusFilter}
               onStatusFilterChange={setStatusFilter}
+              sectorFilter={sectorFilter}
+              onSectorFilterChange={setSectorFilter}
+              availableSectors={AVAILABLE_SECTORS}
               sortBy={sortBy}
               onSortChange={setSortBy}
-              availableJurisdictions={availableJurisdictions}
+              onClearFilters={clearFilters}
               stats={stats}
               onConfirmIncident={confirmIncident}
               onRejectIncident={rejectIncident}
               onAddAnnotation={addAnnotation}
-              onOpenAlertModal={(inc) => setAlertModalIncident(inc)}
-              onOpenUnitDispatchModal={(inc) => setUnitDispatchIncident(inc)}
-              onOpenAuditHistory={() => setAuditModalOpen(true)}
-              onOpenFreshnessDrawer={() => setFreshnessDrawerOpen(true)}
+              onOpenDataSources={() => setDataSourcesOpen(true)}
             />
           )}
 
-          {activeModule === 'live_dispatch_map' && (
-            <LiveDispatchMapView
-              incidents={filteredIncidents}
-              selectedIncident={selectedIncident}
-              onSelectIncident={setSelectedIncidentId}
-              forecastHorizon={forecastHorizon}
-              onForecastHorizonChange={setForecastHorizon}
-              rescueUnits={INITIAL_RESCUE_UNITS}
-              onOpenAlertModal={(inc) => setAlertModalIncident(inc)}
+          {activeNavView === 'map' && (
+            <div className="flex-1 h-full w-full relative">
+              <OperationsMap
+                incidents={filteredIncidents}
+                selectedIncident={selectedIncident}
+                onSelectIncident={setSelectedIncidentId}
+                forecastHorizon={forecastHorizon}
+                onForecastHorizonChange={setForecastHorizon}
+              />
+            </div>
+          )}
+
+          {activeNavView === 'alerts' && (
+            <AlertsListView
+              onSelectIncidentForAlert={(incId) => {
+                setSelectedIncidentId(incId);
+                setActiveNavView('incidents');
+              }}
             />
           )}
 
-          {activeModule === 'rescue_units' && (
-            <RescueUnitsView rescueUnits={INITIAL_RESCUE_UNITS} />
+          {activeNavView === 'metrics' && (
+            <MetricsView incidents={incidents} />
           )}
 
-          {activeModule === 'telemetry_sensors' && (
-            <TelemetryView feeds={INITIAL_FEEDS} />
-          )}
-
-          {activeModule === 'evacuation_corridors' && (
-            <ShelterEvacuationView />
-          )}
-
-          {activeModule === 'shelter_management' && (
-            <ShelterEvacuationView />
-          )}
-
-          {activeModule === 'comms_relay' && (
-            <CommsRelayView
-              incidents={incidents}
-              onOpenAlertModal={(inc) => setAlertModalIncident(inc)}
-            />
-          )}
-
-          {activeModule === 'post_incident_logs' && (
-            <PostIncidentLogsView incidents={incidents} />
+          {activeNavView === 'audit' && (
+            <AuditLogView incidents={incidents} />
           )}
         </main>
       </div>
 
-      {/* 3. Operational Modals & Drawers */}
-      {/* CAP Public Alert Approval Modal */}
-      {alertModalIncident && (
-        <PublicAlertApprovalModal
-          incident={alertModalIncident}
-          responder={responder}
-          onClose={() => setAlertModalIncident(null)}
-          onApprove={(id, payload) => {
-            approveAlert(id, payload);
-          }}
-        />
-      )}
-
-      {/* Rescue Unit Dispatch Modal */}
-      {unitDispatchIncident && (
-        <UnitDispatchModal
-          incident={unitDispatchIncident}
-          rescueUnits={INITIAL_RESCUE_UNITS}
-          onClose={() => setUnitDispatchIncident(null)}
-          onAssignUnit={(id, callsign) => {
-            assignUnit(id, callsign);
-          }}
-        />
-      )}
-
-      {/* Chronological Audit Trail Modal */}
-      {selectedIncident && (
-        <AuditTrailModal
-          isOpen={auditModalOpen}
-          onClose={() => setAuditModalOpen(false)}
-          incident={selectedIncident}
-        />
-      )}
-
-      {/* Satellite Telemetry Freshness Drawer */}
-      <DataFreshnessDrawer
-        isOpen={freshnessDrawerOpen}
-        onClose={() => setFreshnessDrawerOpen(false)}
+      {/* 3. Global Drawers / Modals */}
+      <DataSourcesPanel
+        isOpen={dataSourcesOpen}
+        onClose={() => setDataSourcesOpen(false)}
         feeds={INITIAL_FEEDS}
+      />
+
+      <AboutModal
+        isOpen={aboutModalOpen}
+        onClose={() => setAboutModalOpen(false)}
       />
     </div>
   );

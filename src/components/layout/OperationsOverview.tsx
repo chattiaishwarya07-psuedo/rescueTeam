@@ -1,33 +1,26 @@
 // src/components/layout/OperationsOverview.tsx
 import React, { useState } from 'react';
-import { PanelRightClose, PanelRightOpen, Map as MapIcon, List, FileSearch, Layers } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, MapPin } from 'lucide-react';
 import { IncidentList } from '../incidents/IncidentList';
 import { OperationsMap } from '../map/OperationsMap';
-import { InvestigationPanel } from '../incidents/InvestigationPanel';
-import { StatusCards } from './StatusCards';
-import { Incident, RescueUnit, TelemetryFeed, ResponderRole } from '../../types';
+import { DetailPanel } from '../incidents/DetailPanel';
+import { SummaryStrip } from './SummaryStrip';
+import { Incident, TelemetryFeed, ResponderRole } from '../../types';
 
 interface OperationsOverviewProps {
   incidents: Incident[];
+  areaFilteredIncidents: Incident[];
   filteredIncidents: Incident[];
   selectedIncident: Incident | null;
   selectedIncidentId: string;
   onSelectIncident: (id: string) => void;
   forecastHorizon: 'now' | '+1h' | '+3h' | '+6h';
-  onForecastHorizonChange: (horizon: 'now' | '+1h' | '+3h' | '+6h') => void;
-  rescueUnits: RescueUnit[];
+  onForecastHorizonChange: (h: 'now' | '+1h' | '+3h' | '+6h') => void;
   feeds: TelemetryFeed[];
   currentResponder: {
     name: string;
     role: ResponderRole;
-    callsign: string;
     badgeNumber: string;
-  };
-  permissions: {
-    canAnnotate: boolean;
-    canConfirmReject: boolean;
-    canApprovePublicAlert: boolean;
-    canAssignUnits: boolean;
   };
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -35,197 +28,199 @@ interface OperationsOverviewProps {
   onHazardFilterChange: (h: string) => void;
   severityFilter: string;
   onSeverityFilterChange: (s: string) => void;
-  jurisdictionFilter: string;
-  onJurisdictionFilterChange: (j: string) => void;
   statusFilter: string;
   onStatusFilterChange: (st: string) => void;
+  sectorFilter: string;
+  onSectorFilterChange: (sec: string) => void;
+  areaFilter: string;
+  setAreaFilter: (a: string) => void;
+  clearAreaFilter: () => void;
+  availableSectors: string[];
   sortBy: 'severity' | 'recency' | 'confidence';
   onSortChange: (sort: 'severity' | 'recency' | 'confidence') => void;
-  availableJurisdictions: string[];
+  onClearFilters: () => void;
   stats: {
-    open: number;
+    active: number;
     awaitingReview: number;
     critical: number;
   };
   onConfirmIncident: (id: string, reason?: string) => void;
   onRejectIncident: (id: string, reason: string) => void;
   onAddAnnotation: (id: string, content: string) => void;
-  onOpenAlertModal: (inc: Incident) => void;
-  onOpenUnitDispatchModal: (inc: Incident) => void;
-  onOpenAuditHistory: () => void;
-  onOpenFreshnessDrawer: () => void;
+  onOpenDataSources: () => void;
 }
 
 export const OperationsOverview: React.FC<OperationsOverviewProps> = ({
   incidents,
+  areaFilteredIncidents,
   filteredIncidents,
   selectedIncident,
   selectedIncidentId,
   onSelectIncident,
   forecastHorizon,
   onForecastHorizonChange,
-  rescueUnits,
   feeds,
   currentResponder,
-  permissions,
   searchQuery,
   onSearchChange,
   hazardFilter,
   onHazardFilterChange,
   severityFilter,
   onSeverityFilterChange,
-  jurisdictionFilter,
-  onJurisdictionFilterChange,
   statusFilter,
   onStatusFilterChange,
+  sectorFilter,
+  onSectorFilterChange,
+  areaFilter,
+  setAreaFilter,
+  clearAreaFilter,
+  availableSectors,
   sortBy,
   onSortChange,
-  availableJurisdictions,
+  onClearFilters,
   stats,
   onConfirmIncident,
   onRejectIncident,
   onAddAnnotation,
-  onOpenAlertModal,
-  onOpenUnitDispatchModal,
-  onOpenAuditHistory,
-  onOpenFreshnessDrawer,
+  onOpenDataSources,
 }) => {
-  // Desktop side panel collapsed toggle
-  const [detailsPanelOpen, setDetailsPanelOpen] = useState(true);
-
-  // Mobile / Tablet Tab switch
-  const [mobileTab, setMobileTab] = useState<'map' | 'list' | 'investigation'>('map');
+  const [listCollapsed, setListCollapsed] = useState(false);
+  const [detailCollapsed, setDetailCollapsed] = useState(false);
 
   const staleFeedsCount = feeds.filter(f => f.status === 'Delayed' || f.status === 'Stale').length;
 
   return (
-    <div className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-      {/* 1. Status Summary Cards */}
-      <StatusCards
-        openIncidentsCount={stats.open}
+    <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden bg-opbg select-none">
+      {/* 40px Summary Strip */}
+      <SummaryStrip
+        activeCount={stats.active}
         awaitingReviewCount={stats.awaitingReview}
-        criticalIncidentsCount={stats.critical}
+        criticalCount={stats.critical}
         staleFeedsCount={staleFeedsCount}
-        totalFeedsCount={feeds.length}
+        onFilterAll={onClearFilters}
         onFilterAwaitingReview={() => onStatusFilterChange('under_review')}
         onFilterCritical={() => onSeverityFilterChange('critical')}
-        onOpenFeeds={onOpenFreshnessDrawer}
+        onOpenDataSources={onOpenDataSources}
       />
 
-      {/* Mobile/Tablet Screen View Mode Switcher */}
-      <div className="flex xl:hidden bg-white rounded-lg border border-slate-200 p-1 text-xs select-none">
-        <button
-          onClick={() => setMobileTab('map')}
-          className={`flex-1 py-1.5 font-bold rounded flex items-center justify-center gap-1.5 transition-all ${
-            mobileTab === 'map' ? 'bg-navy-800 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <MapIcon className="w-3.5 h-3.5" />
-          <span>Operational Map</span>
-        </button>
-        <button
-          onClick={() => setMobileTab('list')}
-          className={`flex-1 py-1.5 font-bold rounded flex items-center justify-center gap-1.5 transition-all ${
-            mobileTab === 'list' ? 'bg-navy-800 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <List className="w-3.5 h-3.5" />
-          <span>Incidents ({filteredIncidents.length})</span>
-        </button>
-        <button
-          onClick={() => setMobileTab('investigation')}
-          className={`flex-1 py-1.5 font-bold rounded flex items-center justify-center gap-1.5 transition-all ${
-            mobileTab === 'investigation' ? 'bg-navy-800 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <FileSearch className="w-3.5 h-3.5" />
-          <span>Investigation Panel</span>
-        </button>
-      </div>
-
-      {/* 2. Main Workspace 3-Part Desktop Layout */}
-      <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
-        {/* Part 1: Incident List (Left Column) */}
-        <div className={`w-80 md:w-96 shrink-0 h-full ${
-          mobileTab !== 'list' ? 'hidden xl:flex flex-col' : 'flex flex-col w-full'
-        }`}>
-          <IncidentList
-            incidents={filteredIncidents}
-            selectedIncidentId={selectedIncidentId}
-            onSelectIncident={(id) => {
-              onSelectIncident(id);
-              // On mobile, auto-jump to map or investigation
-              if (window.innerWidth < 1280) {
-                setMobileTab('investigation');
-              }
-            }}
-            searchQuery={searchQuery}
-            onSearchChange={onSearchChange}
-            hazardFilter={hazardFilter}
-            onHazardFilterChange={onHazardFilterChange}
-            severityFilter={severityFilter}
-            onSeverityFilterChange={onSeverityFilterChange}
-            jurisdictionFilter={jurisdictionFilter}
-            onJurisdictionFilterChange={onJurisdictionFilterChange}
-            statusFilter={statusFilter}
-            onStatusFilterChange={onStatusFilterChange}
-            sortBy={sortBy}
-            onSortChange={onSortChange}
-            availableJurisdictions={availableJurisdictions}
-          />
+      {/* Active Area Filter Indicator (shown when an incident/area is clicked) */}
+      {areaFilter !== 'all' && (
+        <div className="px-3 py-1.5 bg-amber-50 border border-amber-200 flex items-center justify-between gap-2 select-none">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span className="text-xs font-semibold text-amber-900 font-mono">Viewing Area:</span>
+            <span className="text-xs font-bold text-navy-900 truncate max-w-xs">{areaFilter}</span>
+          </div>
+          <button
+            onClick={clearAreaFilter}
+            className="text-[10px] font-semibold text-amber-700 hover:text-amber-900 hover:underline px-1.5"
+            title="Show all areas"
+          >
+            Clear area filter
+          </button>
         </div>
+      )}
 
-        {/* Part 2: Interactive Hazard Map (Center Column - Largest Visual Area) */}
-        <div className={`flex-1 rounded-lg border border-slate-200 overflow-hidden shadow-sm relative h-full ${
-          mobileTab !== 'map' ? 'hidden xl:flex flex-col' : 'flex flex-col w-full'
-        }`}>
+      {/* Main 3-Column Area: Incident list 320px | Map (flex) | Detail panel 400px */}
+      <div className="flex-1 flex min-h-0 overflow-hidden relative">
+        {/* Column 1: Incident List (320px, Collapsible) */}
+        {!listCollapsed ? (
+          <div className="w-80 shrink-0 h-full flex flex-col relative z-10 border-r border-slate-200">
+            <IncidentList
+              incidents={areaFilteredIncidents}
+              selectedIncidentId={selectedIncidentId}
+              onSelectIncident={onSelectIncident}
+              searchQuery={searchQuery}
+              onSearchChange={onSearchChange}
+              hazardFilter={hazardFilter}
+              onHazardFilterChange={onHazardFilterChange}
+              severityFilter={severityFilter}
+              onSeverityFilterChange={onSeverityFilterChange}
+              statusFilter={statusFilter}
+              onStatusFilterChange={onStatusFilterChange}
+              sectorFilter={sectorFilter}
+              onSectorFilterChange={onSectorFilterChange}
+              availableSectors={availableSectors}
+              sortBy={sortBy}
+              onSortChange={onSortChange}
+              onClearFilters={onClearFilters}
+              onQuickConfirm={onConfirmIncident}
+              onQuickReject={(id) => onRejectIncident(id, 'Rejected via quick action')}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setListCollapsed(false)}
+            className="w-7 h-12 bg-white border-y border-r border-slate-300 text-slate-600 rounded-r shadow-md self-center z-20 flex items-center justify-center hover:bg-slate-50 transition-colors"
+            title="Expand incident list"
+          >
+            <PanelLeftOpen className="w-4 h-4 text-teal-brand" />
+          </button>
+        )}
+
+        {/* Toggle button to collapse list */}
+        {!listCollapsed && (
+          <button
+            onClick={() => setListCollapsed(true)}
+            className="absolute left-80 top-1/2 -translate-y-1/2 z-20 w-5 h-10 bg-white border border-slate-300 text-slate-500 rounded-r shadow-xs flex items-center justify-center hover:text-navy-900"
+            title="Collapse incident list"
+          >
+            <PanelLeftClose className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Column 2: Map (Flex, at least 50% width) */}
+        <div className="flex-1 h-full min-w-[50%] relative z-0">
           <OperationsMap
             incidents={filteredIncidents}
             selectedIncident={selectedIncident}
             onSelectIncident={onSelectIncident}
             forecastHorizon={forecastHorizon}
             onForecastHorizonChange={onForecastHorizonChange}
-            rescueUnits={rescueUnits}
           />
-
-          {/* Collapsible toggle for details panel on desktop */}
-          <button
-            onClick={() => setDetailsPanelOpen(!detailsPanelOpen)}
-            className="hidden xl:flex absolute top-3 right-3 z-[410] items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-navy-800 text-white text-xs font-semibold shadow-lg hover:bg-navy-900 border border-navy-700 transition-all"
-            title={detailsPanelOpen ? "Collapse investigation panel" : "Expand investigation panel"}
-          >
-            {detailsPanelOpen ? (
-              <>
-                <PanelRightClose className="w-3.5 h-3.5 text-teal-300" />
-                <span>Hide Investigation</span>
-              </>
-            ) : (
-              <>
-                <PanelRightOpen className="w-3.5 h-3.5 text-teal-300" />
-                <span>Show Investigation</span>
-              </>
-            )}
-          </button>
         </div>
 
-        {/* Part 3: Selected Incident Investigation Panel (Right Column) */}
-        {detailsPanelOpen && (
-          <div className={`w-96 lg:w-[410px] shrink-0 h-full ${
-            mobileTab !== 'investigation' ? 'hidden xl:flex flex-col' : 'flex flex-col w-full'
-          }`}>
-            <InvestigationPanel
-              incident={selectedIncident}
-              forecastHorizon={forecastHorizon}
-              currentResponder={currentResponder}
-              permissions={permissions}
-              onConfirm={onConfirmIncident}
-              onReject={onRejectIncident}
-              onAddAnnotation={onAddAnnotation}
-              onOpenAlertModal={onOpenAlertModal}
-              onOpenUnitDispatchModal={onOpenUnitDispatchModal}
-              onOpenAuditHistory={onOpenAuditHistory}
-            />
-          </div>
+        {/* Column 3: Detail Panel (400px, Slides in on selection, Collapsible) */}
+        {!detailCollapsed ? (
+          selectedIncident ? (
+            <div className="w-[400px] shrink-0 h-full flex flex-col relative z-10 border-l border-slate-200 animate-in slide-in-from-right duration-150">
+              <DetailPanel
+                incident={selectedIncident}
+                forecastHorizon={forecastHorizon}
+                currentResponder={currentResponder}
+                onConfirm={onConfirmIncident}
+                onReject={onRejectIncident}
+                onAddAnnotation={onAddAnnotation}
+                onClose={() => setDetailCollapsed(true)}
+              />
+            </div>
+          ) : (
+            <div className="w-[400px] shrink-0 h-full flex flex-col relative z-10 border-l border-slate-200 bg-white p-6 justify-center items-center text-center select-none shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200/80 flex items-center justify-center text-teal-600 mb-3 shadow-xs">
+                <MapPin className="w-7 h-7" />
+              </div>
+              <h3 className="font-bold text-sm text-navy-900 mb-1 font-mono uppercase tracking-wide">
+                No Area Selected
+              </h3>
+              <p className="text-xs text-slate-500 max-w-xs leading-relaxed mb-4">
+                Click on any hazard zone or marker on the map, or select an incident from the list to display satellite evidence, observations, and forecasts for that specific area.
+              </p>
+              <div className="text-[11px] font-mono text-teal-800 bg-teal-50/70 border border-teal-200/60 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+                <span>Select an area to view details</span>
+              </div>
+            </div>
+          )
+        ) : (
+          selectedIncident && (
+            <button
+              onClick={() => setDetailCollapsed(false)}
+              className="w-7 h-12 bg-white border-y border-l border-slate-300 text-slate-600 rounded-l shadow-md self-center z-20 flex items-center justify-center hover:bg-slate-50 transition-colors"
+              title="Expand investigation panel"
+            >
+              <PanelRightOpen className="w-4 h-4 text-teal-brand" />
+            </button>
+          )
         )}
       </div>
     </div>
